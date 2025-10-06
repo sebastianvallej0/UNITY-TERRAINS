@@ -1,0 +1,86 @@
+using UnityEngine;
+using UnityEngine.InputSystem; // Nuevo Input System
+
+[RequireComponent(typeof(CharacterController))]
+public class PlayerMovement : MonoBehaviour
+{
+    [Header("Movimiento")]
+    public float speed = 6f;
+    public float gravity = -9.81f;
+    public float jumpHeight = 1.2f;
+
+    [Header("Mouse Look")]
+    public Transform cam;                 // arrastra Main Camera (si no, se auto-asigna)
+    public float mouseSensitivity = 0.12f; // ajusta 0.08–0.2
+    public float pitchMin = -80f;
+    public float pitchMax = 80f;
+
+    CharacterController cc;
+    Vector3 velocity;
+    float pitch = 0f; // rotación vertical de la cámara
+
+    void Awake()
+    {
+        cc = GetComponent<CharacterController>();
+        if (cam == null && Camera.main != null) cam = Camera.main.transform;
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+    }
+
+    void OnDisable()
+    {
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
+
+    void Update()
+    {
+        var kbd = Keyboard.current;
+        var mouse = Mouse.current;
+
+        // --- Mouse look ---
+        if (mouse != null)
+        {
+            Vector2 d = mouse.delta.ReadValue();
+            float mouseX = d.x * mouseSensitivity;
+            float mouseY = d.y * mouseSensitivity;
+
+            // yaw en el cuerpo
+            transform.Rotate(0f, mouseX, 0f);
+
+            // pitch en la cámara
+            pitch = Mathf.Clamp(pitch - mouseY, pitchMin, pitchMax);
+            if (cam) cam.localRotation = Quaternion.Euler(pitch, 0f, 0f);
+        }
+
+        // ESC para liberar/volver a bloquear el cursor
+        if (kbd != null && kbd.escapeKey.wasPressedThisFrame)
+        {
+            bool locked = Cursor.lockState != CursorLockMode.Locked;
+            Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
+            Cursor.visible = !locked;
+        }
+
+        // --- WASD ---
+        float h = 0f, v = 0f;
+        if (kbd != null)
+        {
+            if (kbd.aKey.isPressed) h -= 1f;
+            if (kbd.dKey.isPressed) h += 1f;
+            if (kbd.wKey.isPressed) v += 1f;
+            if (kbd.sKey.isPressed) v -= 1f;
+        }
+
+        Vector3 move = (transform.right * h + transform.forward * v);
+        if (move.sqrMagnitude > 1f) move.Normalize();
+        cc.Move(move * speed * Time.deltaTime);
+
+        // Gravedad + salto
+        if (cc.isGrounded && velocity.y < 0f) velocity.y = -2f;
+        if (cc.isGrounded && kbd != null && kbd.spaceKey.wasPressedThisFrame)
+            velocity.y = Mathf.Sqrt(-2f * gravity * jumpHeight);
+
+        velocity.y += gravity * Time.deltaTime;
+        cc.Move(velocity * Time.deltaTime);
+    }
+}
